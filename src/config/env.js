@@ -52,7 +52,7 @@ const isDev = parsedEnv.NODE_ENV === 'development';
 if (isDev) {
   parsedEnv.JWT_SECRET = parsedEnv.JWT_SECRET ?? 'dev_placeholder_jwt_secret_please_change_123456';
   parsedEnv.STRIPE_SECRET_KEY = parsedEnv.STRIPE_SECRET_KEY ?? 'dev_placeholder_stripe_secret_key_change_me';
-  parsedEnv.FRONTEND_URL = parsedEnv.FRONTEND_URL ?? 'http://localhost:3001';
+  parsedEnv.FRONTEND_URL = parsedEnv.FRONTEND_URL ?? 'http://localhost:3000';
   parsedEnv.CLOUDINARY_CLOUD_NAME = parsedEnv.CLOUDINARY_CLOUD_NAME ?? 'dev_placeholder_cloud_name';
   parsedEnv.CLOUDINARY_API_KEY = parsedEnv.CLOUDINARY_API_KEY ?? 'dev_placeholder_cloud_api_key';
   parsedEnv.CLOUDINARY_API_SECRET = parsedEnv.CLOUDINARY_API_SECRET ?? 'dev_placeholder_cloud_api_secret';
@@ -75,7 +75,6 @@ const corsAllowedOrigins = parsedEnvFinal.CORS_ALLOWED_ORIGINS
 
 const defaultAllowedOrigins = [
   parsedEnvFinal.FRONTEND_URL,
-  'http://localhost:3001',
   'http://127.0.0.1:5500',
   ...corsAllowedOrigins,
 ].filter(Boolean);
@@ -86,7 +85,3 @@ module.exports = {
   CORS_ALLOWED_ORIGINS: corsAllowedOrigins,
   DEFAULT_ALLOWED_ORIGINS: defaultAllowedOrigins,
 };
-
-
-
-
