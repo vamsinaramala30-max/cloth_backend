@@ -21,7 +21,8 @@ function validateEnv() {
 function getMongoSrvHostOverride() {
   const candidates = [env.MONGODB_SRV_HOST, env.MONGO_SRV_HOST].filter(Boolean);
   const invalidHosts = new Set(['0.0.0.0', 'localhost', '127.0.0.1']);
-  return candidates.find((host) => !invalidHosts.has(host.trim())) || candidates[0] || '';
+  const validCandidate = candidates.find((host) => !invalidHosts.has(host.trim()));
+  return validCandidate || '';
 }
 
 function normalizeMongoSrvUri(uri) {
@@ -219,6 +220,7 @@ async function connectDatabase() {
         connectTimeoutMS: 10_000,
         family: 4,
       });
+      console.log('[DB] MongoDB connection successful!');
 
 
 
@@ -268,4 +270,3 @@ async function connectDatabase() {
 }
 
 module.exports = connectDatabase;
-
