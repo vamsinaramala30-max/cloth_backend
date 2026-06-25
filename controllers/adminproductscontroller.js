@@ -1,4 +1,4 @@
-const Product = require('../models/Product');
+const Product = require('../models/product');
 
 function normalizeSlug(input) {
   return String(input || '')
@@ -88,5 +88,3 @@ const listProductsAdmin = async (req, res) => {
 };
 
 module.exports = { createProduct, listProductsAdmin };
-
-
