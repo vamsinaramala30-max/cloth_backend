@@ -2,6 +2,64 @@ const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const env = require('../src/config/env');
 
+exports.createProduct = async (req, res) => {
+  try {
+    const { name, slug, description, basePrice, salePrice, category, collections, tags, isFeatured, isActive, variants } = req.body;
+
+    const newProduct = new Product({
+      name,
+      slug,
+      description,
+      basePrice, // Make sure this is included
+      salePrice, // Make sure this is included
+      category,
+      collections,
+      tags,
+      isFeatured,
+      isActive,
+      variants,
+    });
+
+    const savedProduct = await newProduct.save();
+    res.status(201).json(savedProduct);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+exports.updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, slug, description, basePrice, salePrice, category, collections, tags, isFeatured, isActive, variants } = req.body;
+
+    const updatedProduct = await Product.findByIdAndUpdate(
+      id,
+      {
+        name,
+        slug,
+        description,
+        basePrice, // Make sure this is included
+        salePrice, // Make sure this is included
+        category,
+        collections,
+        tags,
+        isFeatured,
+        isActive,
+        variants,
+      },
+      { new: true }
+    );
+
+    if (!updatedProduct) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    res.json(updatedProduct);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 const getProducts = async (req, res) => {
   try {
     // Development mode: return mock data when database is unavailable
@@ -14,7 +72,7 @@ const getProducts = async (req, res) => {
           basePrice: 850,
           salePrice: 720,
           isActive: true,
-          variants: [{ images: ['https://images.unsplash.com/photo-1551028719-00167b16ebc5?q=80&w=1000'] }],
+          variants: [{ images: ['`https://images.unsplash.com/photo-1551028719-00167b16ebc5?q=80&w=1000`'] }],
         },
         {
           _id: '2',
@@ -22,18 +80,19 @@ const getProducts = async (req, res) => {
           category: 'Shirts',
           basePrice: 450,
           isActive: true,
-          variants: [{ images: ['https://images.unsplash.com/photo-1503342394128-c104cbb9810d?q=80&w=1000'] }],
+          variants: [{ images: ['`https://images.unsplash.com/photo-1503342394128-c104cbb9810d?q=80&w=1000`'] }],
         },
       ];
-      const { page = 1, limit = 12 } = req.query;
+      // Return all mock products when SKIP_DB is true
       return res.status(200).json({
         success: true,
-        data: mockProducts.slice(0, Number(limit)),
-        pagination: { total: mockProducts.length, page: Number(page), pages: 1 }
+        data: mockProducts,
+        pagination: { total: mockProducts.length } // Simplified pagination for mock data
       });
     }
 
-    const { category, collection, sort, search, page = 1, limit = 12 } = req.query;
+    // Remove 'page' and 'limit' from destructuring as we want all products
+    const { category, collection, sort, search } = req.query;
     const queryConfig = { isActive: true };
 
     if (category) queryConfig.category = category;
@@ -44,18 +103,16 @@ const getProducts = async (req, res) => {
     if (sort === 'price-low-high') sortConfig = { basePrice: 1 };
     if (sort === 'price-high-low') sortConfig = { basePrice: -1 };
 
-    const skipIndex = (Number(page) - 1) * Number(limit);
+    // Fetch all products matching the query, without skip or limit
     const products = await Product.find(queryConfig)
-      .sort(sortConfig)
-      .skip(skipIndex)
-      .limit(Number(limit));
+      .sort(sortConfig);
 
     const totalProducts = await Product.countDocuments(queryConfig);
 
     return res.status(200).json({
       success: true,
       data: products,
-      pagination: { total: totalProducts, page: Number(page), pages: Math.ceil(totalProducts / Number(limit)) }
+      pagination: { total: totalProducts } // Simplified pagination as all products are returned
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
