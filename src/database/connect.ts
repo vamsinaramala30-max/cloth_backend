@@ -104,11 +104,11 @@ async function connectDatabase(): Promise<DbConnection> {
     return { close: async () => console.log('[DB] Mock connection closed') };
   }
 
-  // Proactively convert SRV if host override provided
-  if (uri.startsWith('mongodb+srv://') && (env.MONGODB_SRV_HOST || env.MONGO_SRV_HOST)) {
-    uri = maybeConvertSrvToNonSrv(uri);
-    console.log('[Mongo] Proactively using non-SRV connection (mongodb://).');
-  }
+  // // Proactively convert SRV if host override provided
+  // if (uri.startsWith('mongodb+srv://') && (env.MONGODB_SRV_HOST || env.MONGO_SRV_HOST)) {
+  //   uri = maybeConvertSrvToNonSrv(uri);
+  //   console.log('[Mongo] Proactively using non-SRV connection (mongodb://).');
+  // }
 
   const maxRetries = env.DB_CONNECT_RETRIES;
   const retryDelayMs = env.DB_CONNECT_RETRY_DELAY_MS;
@@ -130,12 +130,13 @@ async function connectDatabase(): Promise<DbConnection> {
 
   for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
     try {
-      let finalUri = normalizeMongoSrvUri(uri);
-      if (finalUri.startsWith('mongodb+srv://') && (env.MONGODB_SRV_HOST || env.MONGO_SRV_HOST)) {
-        finalUri = maybeConvertSrvToNonSrv(finalUri);
-      }
+      await mongoose.connect(env.MONGO_URI!, {
+        maxPoolSize: 20,
+        serverSelectionTimeoutMS: 10000,
+        socketTimeoutMS: 45000,
+        connectTimeoutMS: 10000,
+      });
 
-      await mongoose.connect(finalUri, mongooseOptions);
       console.log('[DB] MongoDB connection successful!');
       mongoose.set('strictQuery', true);
       return mongoose.connection;
