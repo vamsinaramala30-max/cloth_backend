@@ -1,1 +1,1 @@
-// Obsolete legacy file replaced by server.ts
+require('../dist/server.js');
