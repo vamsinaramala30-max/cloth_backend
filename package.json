@@ -2,11 +2,20 @@
   "name": "rare-rab-it-api",
   "version": "1.0.0",
   "description": "Enterprise Luxury Fashion eCommerce Engine",
-  "main": "src/server.js",
+  "main": "dist/server.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "check": "npm run typecheck && npm run lint",
+    "verify": "npm run check && npm run build",
+    "dev:legacy": "nodemon src/server.js",
+    "checkdb": "tsx src/scripts/checkDb.ts",
+    "seed": "tsx src/scripts/seedCollections.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -27,6 +36,18 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
-    "nodemon": "^3.1.14"
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.0.1",
+    "@types/nodemailer": "^8.0.1",
+    "@typescript-eslint/eslint-plugin": "^8.62.0",
+    "@typescript-eslint/parser": "^8.62.0",
+    "eslint": "^10.5.0",
+    "nodemon": "^3.1.14",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
   }
 }
