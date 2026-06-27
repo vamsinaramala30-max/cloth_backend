@@ -130,6 +130,7 @@ export async function verifyOtp(req: Request, res: Response): Promise<void> {
     res.status(200).json({
       success: true,
       user: { name: user.name, email: user.email, role: user.role },
+      token,
     });
   } catch (err) {
     console.error('[otpcontroller.verifyOtp] ', err);

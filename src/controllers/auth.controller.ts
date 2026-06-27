@@ -42,6 +42,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     res.status(201).json({
       success: true,
       user: { name: user.name, email: user.email, role: user.role },
+      token: accessToken,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Registration failed';
@@ -72,6 +73,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     res.status(200).json({
       success: true,
       user: { name: user.name, email: user.email, role: user.role },
+      token: accessToken,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Login failed';
