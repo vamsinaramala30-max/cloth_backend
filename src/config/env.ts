@@ -116,6 +116,7 @@ const defaultAllowedOrigins: string[] = [
   'http://127.0.0.1:5500',
   'http://localhost:3000',
   'http://localhost:3001',
+  'https://plasma-atelier.vercel.app',
   ...corsAllowedOrigins,
 ].filter((o): o is string => Boolean(o));
 
