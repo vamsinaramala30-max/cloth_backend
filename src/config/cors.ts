@@ -12,7 +12,12 @@ const corsOptions: CorsOptions = {
       return;
     }
     const normalizedOrigin = origin.trim().replace(/\/$/, '');
-    if (allowedOrigins.includes(normalizedOrigin)) {
+    if (
+      allowedOrigins.includes(normalizedOrigin) ||
+      allowedOrigins.includes('*') ||
+      normalizedOrigin.startsWith('http://localhost') ||
+      normalizedOrigin.startsWith('http://127.0.0.1')
+    ) {
       callback(null, true);
     } else {
       callback(null, false);
