@@ -654,7 +654,7 @@ const collectionsData = [
 export async function runSeeding() {
   try {
     log('[SEED] Starting database seeding...');
-    log(`[SEED] env.SUPABASE_URL: ${env.SUPABASE_URL}`);
+    log(`[SEED] env.NEXT_PUBLIC_SUPABASE_URL: ${env.NEXT_PUBLIC_SUPABASE_URL}`);
     log(`[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: ${env.SUPABASE_SERVICE_ROLE_KEY ? env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 15) : 'undefined'}`);
 
     // Inspect products table by executing a test insert
