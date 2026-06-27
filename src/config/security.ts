@@ -21,7 +21,7 @@ export function applySecurityShield(app: Application): { authRateLimiter: Reques
         },
       },
       crossOriginEmbedderPolicy: true,
-      crossOriginResourcePolicy: { policy: 'same-site' },
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );
 

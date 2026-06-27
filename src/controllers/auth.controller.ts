@@ -31,10 +31,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     const { accessToken } = generateTokens(user._id.toString(), user.role);
 
+    const isProd = env.NODE_ENV === 'production';
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production' || env.COOKIE_SECURE,
-      sameSite: 'strict',
+      secure: isProd || env.COOKIE_SECURE,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 15 * 60 * 1000,
     });
 
@@ -60,10 +61,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     const { accessToken } = generateTokens(user._id.toString(), user.role);
 
+    const isProd = env.NODE_ENV === 'production';
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production' || env.COOKIE_SECURE,
-      sameSite: 'strict',
+      secure: isProd || env.COOKIE_SECURE,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 15 * 60 * 1000,
     });
 

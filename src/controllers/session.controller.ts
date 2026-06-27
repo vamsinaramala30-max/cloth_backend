@@ -30,10 +30,11 @@ export async function issueRefreshToken(req: Request, res: Response): Promise<vo
 
     await RefreshToken.create({ userId, tokenHash: hash, expiresAt, deviceInfo });
 
+    const isProd = env.NODE_ENV === 'production';
     res.cookie('refreshToken', plain, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production' || env.COOKIE_SECURE,
-      sameSite: 'strict',
+      secure: isProd || env.COOKIE_SECURE,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: expiresAt.getTime() - Date.now(),
     });
 
@@ -82,10 +83,11 @@ export async function refreshAccessToken(req: Request, res: Response): Promise<v
       { expiresIn: '15m' },
     );
 
+    const isProd = env.NODE_ENV === 'production';
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production' || env.COOKIE_SECURE,
-      sameSite: 'strict',
+      secure: isProd || env.COOKIE_SECURE,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 15 * 60 * 1000,
     });
 
@@ -110,8 +112,14 @@ export async function revokeRefreshToken(req: Request, res: Response): Promise<v
       if (ok) await RefreshToken.findByIdAndDelete(t._id);
     }
 
-    res.clearCookie('refreshToken');
-    res.clearCookie('accessToken');
+    const isProd = env.NODE_ENV === 'production';
+    const clearOpts = {
+      httpOnly: true,
+      secure: isProd || env.COOKIE_SECURE,
+      sameSite: isProd ? 'none' : 'lax',
+    } as const;
+    res.clearCookie('refreshToken', clearOpts);
+    res.clearCookie('accessToken', clearOpts);
     res.status(200).json({ success: true });
   } catch (err) {
     console.error('[sessionController.revokeRefreshToken]', err);

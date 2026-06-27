@@ -119,10 +119,11 @@ export async function verifyOtp(req: Request, res: Response): Promise<void> {
       { expiresIn: '15m' },
     );
 
+    const isProd = env.NODE_ENV === 'production';
     res.cookie('accessToken', token, {
       httpOnly: true,
-      secure: env.NODE_ENV === 'production' || env.COOKIE_SECURE,
-      sameSite: 'strict',
+      secure: isProd || env.COOKIE_SECURE,
+      sameSite: isProd ? 'none' : 'lax',
       maxAge: 15 * 60 * 1000,
     });
 
