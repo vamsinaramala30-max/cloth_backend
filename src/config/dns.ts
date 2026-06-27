@@ -4,7 +4,7 @@ import env from './env';
 /**
  * Optional DNS patch helper.
  * If DNS_SERVER_HOST / DNS_SERVER_PORT are provided, override Node's DNS resolver.
- * This improves mongodb+srv:// reliability in restricted environments.
+ * This improves DNS reliability in restricted environments.
  */
 export function patchDnsIfNeeded(): void {
   try {

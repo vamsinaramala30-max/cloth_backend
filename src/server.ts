@@ -62,7 +62,7 @@ async function startServer(): Promise<void> {
       console.log(`Backend URL : http://localhost:${env.PORT}`);
       console.log(`API URL     : http://localhost:${env.PORT}/api`);
       console.log(`Frontend    : ${env.FRONTEND_URL ?? 'not set'}`);
-      console.log(`MongoDB     : Connected`);
+      console.log(`Supabase    : Connected`);
       console.log('==========================================\n');
     });
 

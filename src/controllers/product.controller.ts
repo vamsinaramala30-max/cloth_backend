@@ -245,8 +245,6 @@ export const getProducts = async (req: Request, res: Response): Promise<void> =>
       query = query.contains('collections', ['new-arrivals']);
     }
     if (bestSellers === 'true') {
-      // In MongoDB: $in: ['best-sellers', 'heritage-collection']
-      // We can query with OR / overlapping arrays
       query = query.or('collections.cs.{"best-sellers"},collections.cs.{"heritage-collection"}');
     }
     if (search) {

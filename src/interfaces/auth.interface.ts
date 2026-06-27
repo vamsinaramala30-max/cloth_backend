@@ -1,6 +1,6 @@
 // JWT payload attached to req.user after authentication
 export interface JwtPayload {
-  /** MongoDB ObjectId as string */
+  /** Supabase user UUID */
   id: string;
   /** User role */
   role: string;
