@@ -1,10 +1,10 @@
 import Stripe from 'stripe';
 import type { Request, Response } from 'express';
 import env from '../config/env';
-import Order from '../models/order';
+import { supabase } from '../database/connect';
 import type { IOrderItem, IShippingAddress, IFinancials } from '../interfaces/order.interface';
 
-const stripe = new Stripe(env.STRIPE_SECRET_KEY as string, { apiVersion: '2023-10-16' });
+const stripe = new Stripe(env.STRIPE_SECRET_KEY as string, { apiVersion: '2023-10-16' as any });
 
 export const createCheckoutSession = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -26,19 +26,57 @@ export const createCheckoutSession = async (req: Request, res: Response): Promis
       automatic_payment_methods: { enabled: true },
     });
 
-    const order = await Order.create({
-      user: req.user.id,
-      items,
-      shippingAddress,
-      paymentInfo: { gateway: 'stripe', paymentId: paymentIntent.id, status: 'pending' },
-      financials,
-      estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-    });
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        user_id: req.user.id,
+        shipping_address: shippingAddress,
+        payment_gateway: 'stripe',
+        payment_id: paymentIntent.id,
+        payment_status: 'pending',
+        subtotal: financials.subtotal,
+        discount: financials.discount || 0,
+        shipping: financials.shipping || 0,
+        tax: financials.tax,
+        total: financials.total,
+        order_status: 'pending',
+        estimated_delivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (orderError || !order) {
+      res.status(500).json({ success: false, message: orderError?.message || 'Failed to create order' });
+      return;
+    }
+
+    // Insert order items
+    if (items && items.length > 0) {
+      const dbItems = items.map((i: any) => ({
+        order_id: order.id,
+        product_id: i.product || i.productId,
+        sku: i.sku,
+        name: i.name,
+        quantity: i.quantity,
+        price: i.price,
+        color: i.color,
+        size: i.size,
+        image: i.image,
+      }));
+
+      const { error: itemsError } = await supabase.from('order_items').insert(dbItems);
+      if (itemsError) {
+        // Rollback order
+        await supabase.from('orders').delete().eq('id', order.id);
+        res.status(500).json({ success: false, message: itemsError.message });
+        return;
+      }
+    }
 
     res.status(200).json({
       success: true,
       clientSecret: paymentIntent.client_secret,
-      orderId: order._id,
+      orderId: order.id,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Payment failed';

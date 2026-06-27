@@ -1,7 +1,5 @@
-import type { Document, Model, Types } from 'mongoose';
-
 export interface IOrderItem {
-  product: Types.ObjectId;
+  product: string;
   sku: string;
   name: string;
   quantity: number;
@@ -35,7 +33,9 @@ export interface IFinancials {
 }
 
 export interface IOrder {
-  user: Types.ObjectId;
+  _id?: string;
+  id?: string;
+  user: string;
   items: IOrderItem[];
   shippingAddress: IShippingAddress;
   paymentInfo: IPaymentInfo;
@@ -46,6 +46,3 @@ export interface IOrder {
   createdAt: Date;
   updatedAt: Date;
 }
-
-export type IOrderDocument = IOrder & Document;
-export type IOrderModel = Model<IOrder>;

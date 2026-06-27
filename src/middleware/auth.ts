@@ -1,7 +1,5 @@
-import jwt from 'jsonwebtoken';
 import type { Request, Response, NextFunction } from 'express';
-import env from '../config/env';
-import type { JwtPayload } from '../interfaces/auth.interface';
+import { supabase } from '../database/connect';
 
 /**
  * Verify JWT from cookie or Authorization header and attach decoded payload to req.user.
@@ -23,8 +21,26 @@ export const authenticate = async (
       return;
     }
 
-    const decoded = jwt.verify(token, env.JWT_SECRET as string) as JwtPayload;
-    req.user = decoded;
+    // Call Supabase API to get the user corresponding to the token
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      res.status(401).json({ success: false, message: 'Invalid or expired token' });
+      return;
+    }
+
+    // Fetch the user's role and details from the public profile table
+    const { data: dbUser } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    req.user = {
+      id: user.id,
+      role: dbUser?.role || 'customer',
+    };
+
     next();
   } catch {
     res.status(401).json({ success: false, message: 'Invalid or expired token' });

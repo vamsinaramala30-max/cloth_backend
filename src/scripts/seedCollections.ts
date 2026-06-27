@@ -5,9 +5,7 @@ import path from 'path';
 dotenv.config({ path: path.join(__dirname, '../../.env.local') });
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-import connectDatabase from '../database/connect';
-import Collection from '../models/collection';
-import Product from '../models/product';
+import { supabase } from '../database/connect';
 
 const collectionsData = [
   {
@@ -118,33 +116,55 @@ const collectionsData = [
 
 async function seed() {
   try {
-    console.log('Connecting to database...');
-    await connectDatabase();
-
     console.log('Clearing existing collections...');
-    await Collection.deleteMany({});
+    await supabase.from('collections').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('collection_products').delete().neq('collection_id', '00000000-0000-0000-0000-000000000000');
 
     console.log('Seeding collections...');
+    // Fetch products to associate
+    const { data: products } = await supabase.from('products').select('*');
+
     for (const c of collectionsData) {
-      // Find products that match this collection by checking their collections array in the database
-      // e.g., product has collections: ['new-arrivals', 'Digital Couture']
-      const matchingProducts = await Product.find({
-        $or: [
-          { collections: c.slug },
-          { collections: c.name }
-        ]
+      const matchingProducts = (products || []).filter((p) => {
+        return (
+          p.collections.includes(c.slug) ||
+          p.collections.includes(c.name)
+        );
       });
 
-      const featuredProductIds = matchingProducts.slice(0, 3).map(p => p._id);
+      const featuredProductIds = matchingProducts.slice(0, 3).map((p) => p.id);
 
-      const collection = new Collection({
-        ...c,
-        title: c.name,
-        featuredProducts: featuredProductIds,
-        productCount: matchingProducts.length,
-      });
+      const { data: collection, error } = await supabase
+        .from('collections')
+        .insert({
+          name: c.name,
+          title: c.name,
+          slug: c.slug,
+          description: c.description,
+          long_description: c.longDescription,
+          image: c.image,
+          banner_image: c.bannerImage,
+          accent_color: c.accentColor,
+          featured_products: featuredProductIds,
+          product_count: matchingProducts.length,
+          display_order: c.displayOrder,
+          is_active: c.isActive,
+        })
+        .select()
+        .single();
 
-      await collection.save();
+      if (error || !collection) {
+        throw new Error(`Failed to seed collection ${c.name}: ${error?.message}`);
+      }
+
+      if (matchingProducts.length > 0) {
+        const links = matchingProducts.map((p) => ({
+          collection_id: collection.id,
+          product_id: p.id,
+        }));
+        await supabase.from('collection_products').insert(links);
+      }
+
       console.log(`Seeded collection: ${c.name} with ${matchingProducts.length} associated products.`);
     }
 

@@ -1,10 +1,90 @@
 import type { Request, Response } from 'express';
-import Cart from '../models/cart';
-import Product from '../models/product';
-import { Types } from 'mongoose';
+import { supabase } from '../database/connect';
 
 function getUserId(req: Request): string | undefined {
   return req.user?.id;
+}
+
+async function fetchCartObject(userId: string) {
+  // 1. Get or create cart
+  let { data: cart } = await supabase.from('cart').select('*').eq('user_id', userId).maybeSingle();
+  if (!cart) {
+    const { data: newCart } = await supabase.from('cart').insert({ user_id: userId }).select().single();
+    cart = newCart;
+  }
+
+  // 2. Get cart items
+  const { data: items } = await supabase.from('cart_items').select('*').eq('cart_id', cart.id);
+
+  // 3. Populate product details
+  const productIds = (items || []).map((item) => item.product_id);
+  let products: any[] = [];
+  let variants: any[] = [];
+  if (productIds.length > 0) {
+    const { data: prodData } = await supabase.from('products').select('*').in('id', productIds);
+    products = prodData || [];
+    const { data: varData } = await supabase.from('product_variants').select('*').in('product_id', productIds);
+    variants = varData || [];
+  }
+
+  const mappedItems = (items || []).map((item) => {
+    const prod = products.find((p) => p.id === item.product_id);
+    const pVariants = (variants || [])
+      .filter((v) => v.product_id === item.product_id)
+      .map((v) => ({
+        _id: v.id,
+        id: v.id,
+        sku: v.sku,
+        color: v.color,
+        colorName: v.color_name,
+        size: v.size,
+        stock: v.stock,
+        images: v.images || [],
+      }));
+
+    return {
+      _id: item.id,
+      id: item.id,
+      productId: prod
+        ? {
+            _id: prod.id,
+            id: prod.id,
+            name: prod.name,
+            slug: prod.slug,
+            description: prod.description,
+            basePrice: Number(prod.base_price),
+            salePrice: prod.sale_price !== null && prod.sale_price !== undefined ? Number(prod.sale_price) : undefined,
+            category: prod.category,
+            collections: prod.collections || [],
+            tags: prod.tags || [],
+            isFeatured: prod.is_featured,
+            isActive: prod.is_active,
+            popularity: Number(prod.popularity || 0),
+            variants: pVariants,
+            createdAt: prod.created_at,
+            updatedAt: prod.updated_at,
+          }
+        : item.product_id,
+      variantSku: item.variant_sku,
+      name: item.name,
+      price: Number(item.price),
+      quantity: item.quantity,
+      size: item.size,
+      color: item.color,
+      image: item.image,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+    };
+  });
+
+  return {
+    _id: cart.id,
+    id: cart.id,
+    userId: cart.user_id,
+    items: mappedItems,
+    createdAt: cart.created_at,
+    updatedAt: cart.updated_at,
+  };
 }
 
 export const addToCart = async (req: Request, res: Response): Promise<void> => {
@@ -28,43 +108,83 @@ export const addToCart = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const product = await Product.findById(productId);
+    // 1. Get Product Details
+    const { data: product } = await supabase
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .maybeSingle();
+
     if (!product) {
       res.status(404).json({ success: false, message: 'Product not found' });
       return;
     }
 
-    let cart = await Cart.findOne({ userId });
+    const { data: productVariants } = await supabase
+      .from('product_variants')
+      .select('*')
+      .eq('product_id', productId);
+
+    // 2. Find or Create Cart
+    let { data: cart } = await supabase.from('cart').select('id').eq('user_id', userId).maybeSingle();
     if (!cart) {
-      cart = new Cart({ userId, items: [] });
+      const { data: newCart, error: createError } = await supabase
+        .from('cart')
+        .insert({ user_id: userId })
+        .select('id')
+        .single();
+      if (createError || !newCart) {
+        res.status(500).json({ success: false, message: createError?.message || 'Failed to create cart' });
+        return;
+      }
+      cart = newCart;
     }
 
-    const existingItemIndex = cart.items.findIndex(
-      (item) =>
-        item.productId.toString() === productId &&
-        item.size === size &&
-        item.color === color,
-    );
+    // 3. Check if item already exists in this cart
+    let query = supabase
+      .from('cart_items')
+      .select('*')
+      .eq('cart_id', cart.id)
+      .eq('product_id', productId);
 
-    if (existingItemIndex > -1) {
-      cart.items[existingItemIndex]!.quantity += quantity;
+    if (size) query = query.eq('size', size);
+    else query = query.is('size', null);
+
+    if (color) query = query.eq('color', color);
+    else query = query.is('color', null);
+
+    const { data: existingItems } = await query;
+    const existingItem = existingItems?.[0];
+
+    if (existingItem) {
+      // Update quantity
+      await supabase
+        .from('cart_items')
+        .update({ quantity: existingItem.quantity + quantity })
+        .eq('id', existingItem.id);
     } else {
-      cart.items.push({
-        _id: new Types.ObjectId(),
-        productId: product._id,
-        variantSku,
+      // Find variant image
+      const matchVar = (productVariants || []).find((v) => v.sku === variantSku);
+      const itemImage = matchVar?.images?.[0] || (productVariants || [])[0]?.images?.[0] || '';
+
+      // Insert new cart item
+      await supabase.from('cart_items').insert({
+        cart_id: cart.id,
+        product_id: productId,
+        variant_sku: variantSku,
         quantity,
         size,
         color,
-        price: product.salePrice ?? product.basePrice,
+        price: product.sale_price ?? product.base_price,
         name: product.name,
-        image: product.variants?.[0]?.images?.[0] ?? '',
+        image: itemImage,
       });
     }
 
-    await cart.save();
+    // 4. Retrieve complete updated cart
+    const updatedCart = await fetchCartObject(userId);
 
-    res.status(200).json({ success: true, message: 'Item added to cart', cart });
+    res.status(200).json({ success: true, message: 'Item added to cart', cart: updatedCart });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to add to cart';
     res.status(500).json({ success: false, message });
@@ -79,11 +199,11 @@ export const getCart = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const cart = await Cart.findOne({ userId }).populate('items.productId');
+    const cartObj = await fetchCartObject(userId);
 
     res.status(200).json({
       success: true,
-      data: cart ?? { userId, items: [] },
+      data: cartObj,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to get cart';
@@ -107,26 +227,21 @@ export const updateCartItem = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    const cart = await Cart.findOne({ userId });
+    const { data: cart } = await supabase.from('cart').select('id').eq('user_id', userId).maybeSingle();
     if (!cart) {
       res.status(404).json({ success: false, message: 'Cart not found' });
       return;
     }
 
     if (quantity === 0) {
-      // Filter out the removed item
-      const filtered = cart.items.filter((item) => item._id?.toString() !== itemId);
-      cart.items.splice(0, cart.items.length, ...filtered);
+      await supabase.from('cart_items').delete().eq('id', itemId).eq('cart_id', cart.id);
     } else {
-      const item = cart.items.find((i) => i._id?.toString() === itemId);
-      if (item) {
-        item.quantity = quantity;
-      }
+      await supabase.from('cart_items').update({ quantity }).eq('id', itemId).eq('cart_id', cart.id);
     }
 
-    await cart.save();
+    const updatedCart = await fetchCartObject(userId);
 
-    res.status(200).json({ success: true, message: 'Cart updated', cart });
+    res.status(200).json({ success: true, message: 'Cart updated', cart: updatedCart });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to update cart';
     res.status(500).json({ success: false, message });
@@ -141,7 +256,11 @@ export const clearCart = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    await Cart.deleteOne({ userId });
+    const { data: cart } = await supabase.from('cart').select('id').eq('user_id', userId).maybeSingle();
+    if (cart) {
+      await supabase.from('cart_items').delete().eq('cart_id', cart.id);
+      await supabase.from('cart').delete().eq('id', cart.id);
+    }
 
     res.status(200).json({ success: true, message: 'Cart cleared' });
   } catch (error) {

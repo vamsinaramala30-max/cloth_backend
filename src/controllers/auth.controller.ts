@@ -1,12 +1,6 @@
-import jwt from 'jsonwebtoken';
 import type { Request, Response } from 'express';
+import { supabase } from '../database/connect';
 import env from '../config/env';
-import User from '../models/user';
-
-function generateTokens(id: string, role: string): { accessToken: string } {
-  const accessToken = jwt.sign({ id, role }, env.JWT_SECRET as string, { expiresIn: '15m' });
-  return { accessToken };
-}
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -16,21 +10,57 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       password: string;
     };
 
-    const existingUser = await User.findOne({ email });
+    // 1. Check if user already exists in public.users
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .maybeSingle();
+
     if (existingUser) {
       res.status(400).json({ success: false, message: 'Identity registration overlap.' });
       return;
     }
 
-    const user = await User.create({
-      name,
-      email,
-      passwordHash: password,
-      isVerified: true,
+    // 2. Sign up in Supabase Auth (admin method to auto-verify email)
+    const { data: signUpData, error: signUpError } = await supabase.auth.admin.createUser({
+      email: email.toLowerCase(),
+      password: password,
+      email_confirm: true,
+      user_metadata: { name },
     });
 
-    const { accessToken } = generateTokens(user._id.toString(), user.role);
+    if (signUpError || !signUpData.user) {
+      res.status(400).json({ success: false, message: signUpError?.message || 'Registration failed' });
+      return;
+    }
 
+    // 3. Create record in public.users
+    const { error: insertError } = await supabase.from('users').insert({
+      id: signUpData.user.id,
+      name,
+      email: email.toLowerCase(),
+      role: 'customer',
+      is_verified: true,
+    });
+
+    if (insertError) {
+      res.status(500).json({ success: false, message: insertError.message });
+      return;
+    }
+
+    // 4. Sign in to generate a session/token
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.toLowerCase(),
+      password: password,
+    });
+
+    if (signInError || !signInData.session) {
+      res.status(400).json({ success: false, message: signInError?.message || 'Login failed after signup' });
+      return;
+    }
+
+    const accessToken = signInData.session.access_token;
     const isProd = env.NODE_ENV === 'production';
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
@@ -41,7 +71,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     res.status(201).json({
       success: true,
-      user: { name: user.name, email: user.email, role: user.role },
+      user: { name, email: email.toLowerCase(), role: 'customer' },
       token: accessToken,
     });
   } catch (error) {
@@ -54,14 +84,25 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body as { email: string; password: string };
 
-    const user = await User.findOne({ email });
-    if (!user || !(await user.comparePassword(password))) {
+    // 1. Sign in via Supabase Auth
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: email.toLowerCase(),
+      password,
+    });
+
+    if (signInError || !signInData.session || !signInData.user) {
       res.status(401).json({ success: false, message: 'Invalid dynamic credentials.' });
       return;
     }
 
-    const { accessToken } = generateTokens(user._id.toString(), user.role);
+    // 2. Fetch public profile role
+    const { data: profile } = await supabase
+      .from('users')
+      .select('name, email, role')
+      .eq('id', signInData.user.id)
+      .single();
 
+    const accessToken = signInData.session.access_token;
     const isProd = env.NODE_ENV === 'production';
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
@@ -72,11 +113,33 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     res.status(200).json({
       success: true,
-      user: { name: user.name, email: user.email, role: user.role },
+      user: {
+        name: profile?.name || signInData.user.user_metadata?.name || '',
+        email: profile?.email || signInData.user.email || '',
+        role: profile?.role || 'customer',
+      },
       token: accessToken,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Login failed';
+    res.status(500).json({ success: false, message });
+  }
+};
+
+export const logout = async (req: Request, res: Response): Promise<void> => {
+  try {
+    await supabase.auth.signOut();
+    const isProd = env.NODE_ENV === 'production';
+    const clearOpts = {
+      httpOnly: true,
+      secure: isProd || env.COOKIE_SECURE,
+      sameSite: isProd ? 'none' : 'lax',
+    } as const;
+    res.clearCookie('accessToken', clearOpts);
+    res.clearCookie('refreshToken', clearOpts);
+    res.status(200).json({ success: true, message: 'Logged out successfully' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Logout failed';
     res.status(500).json({ success: false, message });
   }
 };

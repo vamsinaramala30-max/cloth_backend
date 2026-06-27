@@ -1,5 +1,3 @@
-import type { Document, Model, Types } from 'mongoose';
-
 export interface IAddress {
   label: string;
   street: string;
@@ -19,6 +17,8 @@ export interface IDeviceInfo {
 }
 
 export interface IUser {
+  _id?: string;
+  id?: string;
   name: string;
   email: string;
   phone?: string;
@@ -29,15 +29,8 @@ export interface IUser {
   verificationOtp?: string;
   otpExpiry?: Date;
   devices: IDeviceInfo[];
-  wishlist: Types.ObjectId[];
+  wishlist: string[];
   addresses: IAddress[];
   createdAt: Date;
   updatedAt: Date;
 }
-
-export interface IUserMethods {
-  comparePassword(password: string): Promise<boolean>;
-}
-
-export type IUserDocument = IUser & IUserMethods & Document;
-export type IUserModel = Model<IUser, Record<string, never>, IUserMethods>;

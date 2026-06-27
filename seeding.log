@@ -1,0 +1,122 @@
+[SEED] Starting database seeding...
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Seeding error: Failed to seed product Quantum Silk Jacket: TypeError: fetch failed
+[SEED] Starting database seeding...
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Seeding error: Failed to seed product Quantum Silk Jacket: TypeError: fetch failed
+[SEED] Starting database seeding...
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Product seed error details: {"message":"TypeError: fetch failed","details":"TypeError: fetch failed\n\nCaused by: Error: getaddrinfo ENOTFOUND dhiibvzcrvedsptuvdpf.supabase.co (ENOTFOUND)\nError: getaddrinfo ENOTFOUND dhiibvzcrvedsptuvdpf.supabase.co\n    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)","hint":"","code":""}
+[SEED] Seeding error: Failed to seed product Quantum Silk Jacket: TypeError: fetch failed
+[SEED] Starting database seeding...
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Product seed error details: {"message":"TypeError: fetch failed","details":"TypeError: fetch failed\n\nCaused by: Error: getaddrinfo ENOTFOUND dhiibvzcrvedsptuvdpf.supabase.co (ENOTFOUND)\nError: getaddrinfo ENOTFOUND dhiibvzcrvedsptuvdpf.supabase.co\n    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)","hint":"","code":""}
+[SEED] Seeding error: Failed to seed product Quantum Silk Jacket: TypeError: fetch failed
+[SEED] Starting database seeding...
+[SEED] env.SUPABASE_URL: https://dhiibvzcrvedsptuvdpf.supabase.co
+[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: eyJhbGciOiJIUzI
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Product seed error details: {"message":"TypeError: fetch failed","details":"TypeError: fetch failed\n\nCaused by: Error: getaddrinfo ENOTFOUND dhiibvzcrvedsptuvdpf.supabase.co (ENOTFOUND)\nError: getaddrinfo ENOTFOUND dhiibvzcrvedsptuvdpf.supabase.co\n    at GetAddrInfoReqWrap.onlookupall [as oncomplete] (node:dns:122:26)","hint":"","code":""}
+[SEED] Seeding error: Failed to seed product Quantum Silk Jacket: TypeError: fetch failed
+[SEED] Starting database seeding...
+[SEED] env.SUPABASE_URL: https://lzwjohrdgrhkkepobnsf.supabase.co
+[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: eyJhbGciOiJIUzI
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Product seed error details: {"code":"PGRST204","details":null,"hint":null,"message":"Could not find the 'collections' column of 'products' in the schema cache"}
+[SEED] Seeding error: Failed to seed product Quantum Silk Jacket: Could not find the 'collections' column of 'products' in the schema cache
+[SEED] Starting database seeding...
+[SEED] env.SUPABASE_URL: https://lzwjohrdgrhkkepobnsf.supabase.co
+[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: eyJhbGciOiJIUzI
+[SEED] Failed to fetch schema: 401
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Product seed error details: {"code":"PGRST204","details":null,"hint":null,"message":"Could not find the 'collections' column of 'products' in the schema cache"}
+[SEED] Seeding error: Failed to seed product Quantum Silk Jacket: Could not find the 'collections' column of 'products' in the schema cache
+[SEED] Starting database seeding...
+[SEED] env.SUPABASE_URL: https://lzwjohrdgrhkkepobnsf.supabase.co
+[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: eyJhbGciOiJIUzI
+[SEED] Products table is empty
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Product seed error details: {"code":"PGRST204","details":null,"hint":null,"message":"Could not find the 'collections' column of 'products' in the schema cache"}
+[SEED] Seeding error: Failed to seed product Quantum Silk Jacket: Could not find the 'collections' column of 'products' in the schema cache
+[SEED] Starting database seeding...
+[SEED] env.SUPABASE_URL: https://lzwjohrdgrhkkepobnsf.supabase.co
+[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: eyJhbGciOiJIUzI
+[SEED] Test insert error: {"code":"42501","details":null,"hint":null,"message":"new row violates row-level security policy for table \"products\""}
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Product seed error details: {"code":"PGRST204","details":null,"hint":null,"message":"Could not find the 'collections' column of 'products' in the schema cache"}
+[SEED] Seeding error: Failed to seed product Quantum Silk Jacket: Could not find the 'collections' column of 'products' in the schema cache
+[SEED] Starting database seeding...
+[SEED] env.SUPABASE_URL: https://lzwjohrdgrhkkepobnsf.supabase.co
+[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: eyJhbGciOiJIUzI
+[SEED] Test insert success! Columns: ["id","name","slug","description","base_price","sale_price","category","tags","is_featured","is_active","popularity","created_at","updated_at"]
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Product seed error details: {"code":"PGRST204","details":null,"hint":null,"message":"Could not find the 'collections' column of 'products' in the schema cache"}
+[SEED] Seeding error: Failed to seed product Quantum Silk Jacket: Could not find the 'collections' column of 'products' in the schema cache
+[SEED] Starting database seeding...
+[SEED] env.SUPABASE_URL: https://lzwjohrdgrhkkepobnsf.supabase.co
+[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: eyJhbGciOiJIUzI
+[SEED] Test insert success! Columns: ["id","name","slug","description","base_price","sale_price","category","tags","is_featured","is_active","popularity","created_at","updated_at"]
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Product seed error details: {"code":"PGRST204","details":null,"hint":null,"message":"Could not find the 'collections' column of 'products' in the schema cache"}
+[SEED] Seeding error: Failed to seed product Quantum Silk Jacket: Could not find the 'collections' column of 'products' in the schema cache
+[SEED] Starting database seeding...
+[SEED] env.SUPABASE_URL: https://lzwjohrdgrhkkepobnsf.supabase.co
+[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: eyJhbGciOiJIUzI
+[SEED] Test insert success! Columns: ["id","name","slug","description","base_price","sale_price","category","tags","is_featured","is_active","popularity","created_at","updated_at"]
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Starting database seeding...
+[SEED] env.SUPABASE_URL: https://lzwjohrdgrhkkepobnsf.supabase.co
+[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: eyJhbGciOiJIUzI
+[SEED] Test insert success! Columns: ["id","name","slug","description","base_price","sale_price","category","tags","is_featured","is_active","popularity","created_at","updated_at"]
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Seeded 31 products.
+[SEED] Seeding error: Failed to seed collection New Arrivals: Could not find the 'featured_products' column of 'collections' in the schema cache
+[SEED] Starting database seeding...
+[SEED] env.SUPABASE_URL: https://lzwjohrdgrhkkepobnsf.supabase.co
+[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: eyJhbGciOiJIUzI
+[SEED] Test insert success! Columns: ["id","name","slug","description","base_price","sale_price","category","tags","is_featured","is_active","popularity","created_at","updated_at"]
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Starting database seeding...
+[SEED] env.SUPABASE_URL: https://lzwjohrdgrhkkepobnsf.supabase.co
+[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: eyJhbGciOiJIUzI
+[SEED] Test insert success! Columns: ["id","name","slug","description","base_price","sale_price","category","tags","is_featured","is_active","popularity","created_at","updated_at"]
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Seeded 31 products.
+[SEED] Seeded collection: New Arrivals with 9 products.
+[SEED] Seeded collection: Summer Edit with 9 products.
+[SEED] Seeded collection: Evening Couture with 5 products.
+[SEED] Seeded collection: Digital Couture with 7 products.
+[SEED] Seeded collection: Editorial Picks with 9 products.
+[SEED] Seeded collection: Limited Edition with 9 products.
+[SEED] Seeded collection: AI Collection with 8 products.
+[SEED] Seeded collection: Heritage Collection with 6 products.
+[SEED] Starting database seeding...
+[SEED] env.SUPABASE_URL: https://lzwjohrdgrhkkepobnsf.supabase.co
+[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: eyJhbGciOiJIUzI
+[SEED] Test insert success! Columns: ["id","name","slug","description","base_price","sale_price","category","tags","is_featured","is_active","popularity","created_at","updated_at"]
+[SEED] Clearing existing data...
+[SEED] Cleared existing data.
+[SEED] Seeded 31 products.
+[SEED] Seeded collection: New Arrivals with 9 products.
+[SEED] Seeded collection: Summer Edit with 9 products.
+[SEED] Seeded collection: Evening Couture with 5 products.
+[SEED] Seeded collection: Digital Couture with 7 products.
+[SEED] Seeded collection: Editorial Picks with 9 products.
+[SEED] Seeded collection: Limited Edition with 9 products.
+[SEED] Seeded collection: AI Collection with 8 products.
+[SEED] Seeded collection: Heritage Collection with 6 products.

@@ -1,12 +1,19 @@
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 
+// Load env vars
 dotenv.config({ path: path.join(__dirname, '../../.env.local') });
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-import connectDatabase from '../database/connect';
-import Product from '../models/product';
-import Collection from '../models/collection';
+import { supabase } from '../database/connect';
+import env from '../config/env';
+
+const logFile = path.join(__dirname, '../../seeding.log');
+function log(msg: string) {
+  console.log(msg);
+  fs.appendFileSync(logFile, msg + '\n');
+}
 
 const productsData = [
   // 1
@@ -76,7 +83,7 @@ const productsData = [
     isActive: true,
     popularity: 91,
     variants: [
-      { sku: 'NCB-NEO-M', color: '#39ff14', colorName: 'Neon Green', size: 'M', stock: 8, images: ['https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=1000'] }
+      { sku: 'NCB-NEO-M', color: '#39ff14', colorName: 'Neon Green', size: 'M', stock: 8, images: ['https://images.unsplash.com/photo-1469334031218-e382a71b716b-a303027c1d8b?q=80&w=1000'] }
     ]
   },
   // 5
@@ -644,44 +651,145 @@ const collectionsData = [
   },
 ];
 
-async function seed() {
+export async function runSeeding() {
   try {
-    console.log('Connecting to database...');
-    process.env.SKIP_DB = 'false';
-    await connectDatabase();
+    log('[SEED] Starting database seeding...');
+    log(`[SEED] env.SUPABASE_URL: ${env.SUPABASE_URL}`);
+    log(`[SEED] env.SUPABASE_SERVICE_ROLE_KEY prefix: ${env.SUPABASE_SERVICE_ROLE_KEY ? env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 15) : 'undefined'}`);
 
-    console.log('Clearing old products and collections...');
-    await Product.deleteMany({});
-    await Collection.deleteMany({});
-
-    console.log('Inserting 31 detailed realistic products...');
-    const createdProducts = await Product.create(productsData);
-    console.log(`Inserted ${createdProducts.length} products.`);
-
-    console.log('Creating and linking collections...');
-    for (const c of collectionsData) {
-      const matchingProducts = createdProducts.filter((p) => {
-        const pCol = p.get('collections');
-        return pCol && (pCol.includes(c.slug) || pCol.includes(c.name));
-      });
-
-      const featuredProductIds = matchingProducts.slice(0, 4).map((p) => p._id);
-      const collection = new Collection({
-        ...c,
-        title: c.name,
-        featuredProducts: featuredProductIds,
-        productCount: matchingProducts.length,
-      });
-      await collection.save();
-      console.log(`Seeded collection: ${c.name} with ${matchingProducts.length} products linked.`);
+    // Inspect products table by executing a test insert
+    try {
+      const { data, error } = await supabase.from('products').insert({
+        name: 'Test Product ' + Date.now(),
+        slug: 'test-product-' + Date.now(),
+        description: 'Test Description',
+        base_price: 100,
+        category: 'Test'
+      }).select();
+      if (error) {
+        log(`[SEED] Test insert error: ${JSON.stringify(error)}`);
+      } else if (data && data.length > 0) {
+        log(`[SEED] Test insert success! Columns: ${JSON.stringify(Object.keys(data[0]))}`);
+        // Delete it afterwards
+        await supabase.from('products').delete().eq('id', data[0].id);
+      }
+    } catch (err: any) {
+      log(`[SEED] Test insert query error: ${err.message}`);
     }
 
-    console.log('Seeding completed successfully!');
-    process.exit(0);
-  } catch (error) {
-    console.error('Error seeding database:', error);
-    process.exit(1);
+    // 1. Clear database
+    log('[SEED] Clearing existing data...');
+    await supabase.from('product_variants').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('collection_products').delete().neq('collection_id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('collections').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    log('[SEED] Cleared existing data.');
+
+    // 2. Insert Products and Variants
+    const createdProducts: any[] = [];
+    for (const p of productsData) {
+      const { data: product, error: prodErr } = await supabase
+        .from('products')
+        .insert({
+          name: p.name,
+          slug: p.slug,
+          description: p.description,
+          base_price: p.basePrice,
+          sale_price: p.salePrice || null,
+          category: p.category,
+          tags: p.tags,
+          is_featured: p.isFeatured,
+          is_active: p.isActive,
+          popularity: p.popularity,
+        })
+        .select()
+        .single();
+
+      if (prodErr || !product) {
+        log(`[SEED] Product seed error details: ${JSON.stringify(prodErr)}`);
+        throw new Error(`Failed to seed product ${p.name}: ${prodErr?.message}`);
+      }
+
+      createdProducts.push({
+        ...product,
+        collections: p.collections
+      });
+
+      // Insert variants for this product
+      if (p.variants && p.variants.length > 0) {
+        const dbVariants = p.variants.map((v: any) => ({
+          product_id: product.id,
+          sku: v.sku,
+          color: v.color,
+          color_name: v.colorName,
+          size: v.size,
+          stock: v.stock,
+          images: v.images || [],
+        }));
+
+        const { error: varErr } = await supabase.from('product_variants').insert(dbVariants);
+        if (varErr) {
+          throw new Error(`Failed to seed variants for ${p.name}: ${varErr.message}`);
+        }
+      }
+    }
+    log(`[SEED] Seeded ${createdProducts.length} products.`);
+
+    // 3. Insert Collections with matching products references
+    for (const c of collectionsData) {
+      const matchingProducts = createdProducts.filter((p) => {
+        return (
+          p.collections.includes(c.slug) ||
+          p.collections.includes(c.name)
+        );
+      });
+
+      const featuredProductIds = matchingProducts.slice(0, 4).map((p) => p.id);
+
+      const { data: collection, error: colErr } = await supabase
+        .from('collections')
+        .insert({
+          name: c.name,
+          title: c.name,
+          slug: c.slug,
+          description: c.description,
+          long_description: c.longDescription,
+          image: c.image,
+          banner_image: c.bannerImage,
+          accent_color: c.accentColor,
+          product_count: matchingProducts.length,
+          display_order: c.displayOrder,
+          is_active: c.isActive,
+          seo_title: c.seoTitle,
+          seo_description: c.seoDescription,
+        })
+        .select()
+        .single();
+
+      if (colErr || !collection) {
+        throw new Error(`Failed to seed collection ${c.name}: ${colErr?.message}`);
+      }
+
+      // Link in collection_products map
+      if (matchingProducts.length > 0) {
+        const links = matchingProducts.map((p) => ({
+          collection_id: collection.id,
+          product_id: p.id,
+        }));
+        await supabase.from('collection_products').insert(links);
+      }
+
+      log(`[SEED] Seeded collection: ${c.name} with ${matchingProducts.length} products.`);
+    }
+
+    console.log('[SEED] Database seeded successfully with 31 products and 8 collections!');
+  } catch (error: any) {
+    log(`[SEED] Seeding error: ${error instanceof Error ? error.message : String(error)}`);
+    if (error && typeof error === 'object' && 'cause' in error) {
+      log(`[SEED] Cause: ${error.cause}`);
+      if (error.cause && typeof error.cause === 'object' && 'stack' in error.cause) {
+        log(`[SEED] Cause Stack: ${error.cause.stack}`);
+      }
+    }
   }
 }
-
-seed();

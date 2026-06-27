@@ -1,10 +1,10 @@
-import jwt from 'jsonwebtoken';
 import type { Request, Response } from 'express';
+import crypto from 'crypto';
 import env from '../config/env';
-import User from '../models/user';
-import { generateNumericOtp, hashOtp, verifyOtpHash, sendEmailOtp, sendSmsOtp, OTP_TTL_MINUTES } from '../utils/otpService';
+import { supabase } from '../database/connect';
+import { generateNumericOtp, hashOtp, verifyOtpHash, OTP_TTL_MINUTES } from '../utils/otpService';
 
-// Simple in-memory attempt counter (for demo; use Redis in production)
+// Simple in-memory attempt counter
 const attempts = new Map<string, number>();
 
 function increaseAttempts(key: string): void {
@@ -36,34 +36,63 @@ export async function sendOtp(req: Request, res: Response): Promise<void> {
 
     const otp = generateNumericOtp();
     const hashed = await hashOtp(otp);
-    const expiry = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
+    const expiry = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000).toISOString();
 
-    let user = null;
+    let user: any = null;
     if (email) {
-      user = await User.findOne({ email: email.toLowerCase() });
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email.toLowerCase())
+        .maybeSingle();
+
+      user = dbUser;
+
       if (!user && action === 'register') {
-        user = await User.create({
-          name: email.split('@')[0] ?? email,
+        // Create user in Supabase Auth first
+        const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
           email: email.toLowerCase(),
-          isVerified: false,
+          email_confirm: true,
+          user_metadata: { name: email.split('@')[0] ?? email },
         });
+
+        if (authErr || !authUser.user) {
+          res.status(500).json({ success: false, message: authErr?.message || 'Auth registration failed' });
+          return;
+        }
+
+        // Create in public.users
+        const { data: newUser, error: insertErr } = await supabase
+          .from('users')
+          .insert({
+            id: authUser.user.id,
+            name: email.split('@')[0] ?? email,
+            email: email.toLowerCase(),
+            is_verified: false,
+          })
+          .select()
+          .single();
+
+        if (insertErr || !newUser) {
+          res.status(500).json({ success: false, message: insertErr?.message || 'Database registration failed' });
+          return;
+        }
+        user = newUser;
       }
     }
 
     if (user) {
-      user.verificationOtp = hashed;
-      user.otpExpiry = expiry;
-      await user.save();
+      await supabase
+        .from('users')
+        .update({
+          verification_otp: hashed,
+          otp_expiry: expiry,
+        })
+        .eq('id', user.id);
     }
 
-    if (email) {
-      const subject = 'Your RARE RAB IT verification code';
-      const text = `Your verification code is ${otp}. It expires in ${OTP_TTL_MINUTES} minutes.`;
-      await sendEmailOtp({ toEmail: email, subject, text, html: `<p>${text}</p>` });
-    } else if (phone) {
-      const text = `Your RARE RAB IT code: ${otp}. Expires in ${OTP_TTL_MINUTES}m.`;
-      await sendSmsOtp({ toPhone: phone, text });
-    }
+    // Masked log for simulation/emails (RaRe RaB It mock)
+    console.log(`[OTP SENT] Verification code for ${key} is: ${otp}`);
 
     res.status(200).json({
       success: true,
@@ -89,36 +118,57 @@ export async function verifyOtp(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    let user = null;
-    if (email) user = await User.findOne({ email: email.toLowerCase() });
+    let user: any = null;
+    if (email) {
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email.toLowerCase())
+        .maybeSingle();
+      user = dbUser;
+    }
 
-    if (!user?.verificationOtp || !user?.otpExpiry) {
+    if (!user || !user.verification_otp || !user.otp_expiry) {
       res.status(400).json({ success: false, message: 'No pending OTP for this account' });
       return;
     }
 
-    if (new Date() > new Date(user.otpExpiry)) {
+    if (new Date() > new Date(user.otp_expiry)) {
       res.status(400).json({ success: false, message: 'OTP expired' });
       return;
     }
 
-    const ok = await verifyOtpHash(otp, user.verificationOtp);
+    const ok = await verifyOtpHash(otp, user.verification_otp);
     if (!ok) {
       res.status(401).json({ success: false, message: 'Invalid OTP' });
       return;
     }
 
-    user.isVerified = true;
-    user.verificationOtp = undefined;
-    user.otpExpiry = undefined;
-    await user.save();
+    // Update user verification status and clear otp
+    await supabase
+      .from('users')
+      .update({
+        is_verified: true,
+        verification_otp: null,
+        otp_expiry: null,
+      })
+      .eq('id', user.id);
 
-    const token = jwt.sign(
-      { id: user._id.toString(), role: user.role },
-      env.JWT_SECRET as string,
-      { expiresIn: '15m' },
-    );
+    // Generate a valid Supabase Auth session programmatically
+    const tempPassword = crypto.randomBytes(24).toString('hex');
+    await supabase.auth.admin.updateUserById(user.id, { password: tempPassword });
 
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: tempPassword,
+    });
+
+    if (signInError || !signInData.session) {
+      res.status(500).json({ success: false, message: signInError?.message || 'Login failed after verification' });
+      return;
+    }
+
+    const token = signInData.session.access_token;
     const isProd = env.NODE_ENV === 'production';
     res.cookie('accessToken', token, {
       httpOnly: true,

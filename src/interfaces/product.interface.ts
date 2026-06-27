@@ -1,5 +1,3 @@
-import type { Document, Model } from 'mongoose';
-
 export interface IProductVariant {
   sku: string;
   color: string;
@@ -10,6 +8,8 @@ export interface IProductVariant {
 }
 
 export interface IProduct {
+  _id?: string;
+  id?: string;
   name: string;
   slug: string;
   description: string;
@@ -25,10 +25,3 @@ export interface IProduct {
   createdAt: Date;
   updatedAt: Date;
 }
-
-export interface IProductMethods {
-  // custom methods can be added here
-}
-
-export type IProductDocument = IProduct & IProductMethods & Document;
-export type IProductModel = Model<IProduct, Record<string, never>, IProductMethods>;

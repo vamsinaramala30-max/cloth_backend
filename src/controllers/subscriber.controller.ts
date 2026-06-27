@@ -1,8 +1,8 @@
 import type { Request, Response } from 'express';
-import Subscriber from '../models/subscriber';
+import { supabase } from '../database/connect';
 import { sendWelcomeEmail } from '../utils/mailService';
 
-export async function subscribe(req: Request, res: Response): Promise<void> {
+export const subscribe = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, phone, source, meta } = (req.body ?? {}) as {
       email?: string;
@@ -16,28 +16,54 @@ export async function subscribe(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const existing = email ? await Subscriber.findOne({ email: email.toLowerCase() }) : null;
+    const emailKey = email ? email.toLowerCase() : null;
+
+    let existing = null;
+    if (emailKey) {
+      const { data } = await supabase
+        .from('subscribers')
+        .select('*')
+        .eq('email', emailKey)
+        .maybeSingle();
+      existing = data;
+    }
+
     if (existing) {
-      existing.optedIn = true;
-      existing.source = existing.source ?? source;
-      existing.meta = { ...(existing.meta as Record<string, unknown> ?? {}), ...(meta ?? {}) };
-      await existing.save();
+      await supabase
+        .from('subscribers')
+        .update({
+          opted_in: true,
+          source: existing.source ?? source,
+          meta: { ...(existing.meta || {}), ...(meta || {}) },
+        })
+        .eq('id', existing.id);
+
       res.status(200).json({ success: true, message: 'Already subscribed' });
       return;
     }
 
-    const created = await Subscriber.create({
-      email: email?.toLowerCase(),
-      phone,
-      source,
-      meta,
-    });
+    const { data: created, error } = await supabase
+      .from('subscribers')
+      .insert({
+        email: emailKey,
+        phone,
+        source,
+        meta,
+        opted_in: true,
+      })
+      .select()
+      .single();
 
-    if (email) {
+    if (error || !created) {
+      res.status(500).json({ success: false, message: error?.message || 'Subscribe failed' });
+      return;
+    }
+
+    if (emailKey) {
       try {
         const text = 'Thanks for subscribing to RARE RAB IT.';
         await sendWelcomeEmail({
-          to: email,
+          to: emailKey,
           subject: 'Welcome to RARE RAB IT',
           text,
           html: `<p>${text}</p>`,
@@ -47,14 +73,14 @@ export async function subscribe(req: Request, res: Response): Promise<void> {
       }
     }
 
-    res.status(201).json({ success: true, message: 'Subscribed', id: created._id });
+    res.status(201).json({ success: true, message: 'Subscribed', id: created.id });
   } catch (err) {
     console.error('[subscriber.subscribe]', err);
     res.status(500).json({ success: false, message: 'Subscribe failed' });
   }
-}
+};
 
-export async function unsubscribe(req: Request, res: Response): Promise<void> {
+export const unsubscribe = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, phone } = (req.body ?? {}) as { email?: string; phone?: string };
 
@@ -63,28 +89,54 @@ export async function unsubscribe(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    const query = email ? { email: email.toLowerCase() } : { phone };
-    const sub = await Subscriber.findOne(query);
-    if (!sub) {
+    let query = supabase.from('subscribers').select('*');
+    if (email) {
+      query = query.eq('email', email.toLowerCase());
+    } else {
+      query = query.eq('phone', phone);
+    }
+
+    const { data: sub, error } = await query.maybeSingle();
+
+    if (error || !sub) {
       res.status(404).json({ success: false, message: 'Subscriber not found' });
       return;
     }
 
-    sub.optedIn = false;
-    await sub.save();
+    await supabase
+      .from('subscribers')
+      .update({ opted_in: false })
+      .eq('id', sub.id);
+
     res.status(200).json({ success: true, message: 'Unsubscribed' });
   } catch (err) {
     console.error('[subscriber.unsubscribe]', err);
     res.status(500).json({ success: false, message: 'Unsubscribe failed' });
   }
-}
+};
 
-export async function listSubscribers(req: Request, res: Response): Promise<void> {
+export const listSubscribers = async (req: Request, res: Response): Promise<void> => {
   try {
-    const subs = await Subscriber.find({}).sort({ createdAt: -1 }).limit(200);
-    res.status(200).json({ success: true, data: subs });
+    const { data: subs, error } = await supabase
+      .from('subscribers')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (error) {
+      res.status(500).json({ success: false, message: error.message });
+      return;
+    }
+
+    const mapped = (subs || []).map((s) => ({
+      ...s,
+      _id: s.id,
+      optedIn: s.opted_in,
+    }));
+
+    res.status(200).json({ success: true, data: mapped });
   } catch (err) {
     console.error('[subscriber.list]', err);
     res.status(500).json({ success: false, message: 'Failed to list subscribers' });
   }
-}
+};

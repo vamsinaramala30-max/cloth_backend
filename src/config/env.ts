@@ -12,8 +12,8 @@ dotenv.config();
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().int().positive().default(5001),
-  MONGODB_URI: z.string().trim().optional(),
-  MONGO_URI: z.string().trim().optional(),
+  SUPABASE_URL: z.string().trim().min(1, 'SUPABASE_URL is required'),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().trim().min(1, 'SUPABASE_SERVICE_ROLE_KEY is required'),
 
   JWT_SECRET: z
     .string()
@@ -31,12 +31,6 @@ const envSchema = z.object({
   CLOUDINARY_API_SECRET: z.string().trim().min(1).optional(),
 
   COOKIE_SECURE: z.preprocess((v) => v === 'true' || v === true, z.boolean().default(false)),
-
-  MONGODB_SRV_HOST: z.string().trim().optional(),
-  MONGO_SRV_HOST: z.string().trim().optional(),
-  MONGODB_PORT: z.coerce.number().int().positive().default(27017),
-  DB_CONNECT_RETRIES: z.coerce.number().int().positive().default(5),
-  DB_CONNECT_RETRY_DELAY_MS: z.coerce.number().int().positive().default(3000),
 
   DNS_SERVER_HOST: z.string().trim().optional(),
   DNS_SERVER_PORT: z.coerce.number().int().positive().optional(),
@@ -91,20 +85,6 @@ if (isDev) {
     parsedEnv.JWT_REFRESH_SECRET ?? 'dev_placeholder_jwt_refresh_secret_change_123456';
 }
 
-const mongoUri = parsedEnv.MONGODB_URI ?? parsedEnv.MONGO_URI;
-
-if (!mongoUri) {
-  if (parsedEnv.NODE_ENV === 'production') {
-    console.error(
-      '[ENV VALIDATION FAILED] Missing required environment variable: MONGODB_URI or MONGO_URI',
-    );
-    process.exit(1);
-  }
-  console.warn(
-    '[ENV] No MongoDB URI provided. Backend will run in degraded mode without DB in development.',
-  );
-}
-
 const corsAllowedOrigins: string[] = parsedEnv.CORS_ALLOWED_ORIGINS
   ? parsedEnv.CORS_ALLOWED_ORIGINS.split(',')
       .map((origin) => origin.trim())
@@ -123,13 +103,12 @@ const defaultAllowedOrigins: string[] = [
 // Export a single typed config object — never access process.env directly elsewhere
 const env = {
   ...parsedEnv,
-  MONGO_URI: mongoUri,
   CORS_ALLOWED_ORIGINS: corsAllowedOrigins,
   DEFAULT_ALLOWED_ORIGINS: defaultAllowedOrigins,
 } as EnvSchema & {
-  MONGO_URI: string | undefined;
   CORS_ALLOWED_ORIGINS: string[];
   DEFAULT_ALLOWED_ORIGINS: string[];
 };
 
 export default env;
+

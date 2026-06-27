@@ -1,9 +1,7 @@
-import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import type { Request, Response } from 'express';
-import RefreshToken from '../models/refreshToken';
-import User from '../models/user';
+import { supabase } from '../database/connect';
 import env from '../config/env';
 
 function generateRefreshTokenPlain(): string {
@@ -26,16 +24,26 @@ export async function issueRefreshToken(req: Request, res: Response): Promise<vo
     const hash = await bcrypt.hash(plain, 12);
     const expiresAt = new Date(
       Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
-    );
+    ).toISOString();
 
-    await RefreshToken.create({ userId, tokenHash: hash, expiresAt, deviceInfo });
+    const { error } = await supabase.from('refresh_tokens').insert({
+      user_id: userId,
+      token_hash: hash,
+      expires_at: expiresAt,
+      device_info: deviceInfo,
+    });
+
+    if (error) {
+      res.status(500).json({ success: false, message: error.message });
+      return;
+    }
 
     const isProd = env.NODE_ENV === 'production';
     res.cookie('refreshToken', plain, {
       httpOnly: true,
       secure: isProd || env.COOKIE_SECURE,
       sameSite: isProd ? 'none' : 'lax',
-      maxAge: expiresAt.getTime() - Date.now(),
+      maxAge: env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000,
     });
 
     res.status(201).json({ success: true });
@@ -53,13 +61,20 @@ export async function refreshAccessToken(req: Request, res: Response): Promise<v
       return;
     }
 
-    const tokens = await RefreshToken.find({ expiresAt: { $gt: new Date() } })
-      .sort({ createdAt: -1 })
-      .limit(100);
+    // Get all valid unexpired refresh tokens
+    const { data: tokens, error } = await supabase
+      .from('refresh_tokens')
+      .select('*')
+      .gt('expires_at', new Date().toISOString());
+
+    if (error || !tokens) {
+      res.status(401).json({ success: false, message: 'Invalid refresh token' });
+      return;
+    }
 
     let matched = null;
     for (const t of tokens) {
-      const ok = await bcrypt.compare(cookieToken, t.tokenHash);
+      const ok = await bcrypt.compare(cookieToken, t.token_hash);
       if (ok) {
         matched = t;
         break;
@@ -71,18 +86,32 @@ export async function refreshAccessToken(req: Request, res: Response): Promise<v
       return;
     }
 
-    const user = await User.findById(matched.userId);
+    const { data: user } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', matched.user_id)
+      .maybeSingle();
+
     if (!user) {
       res.status(401).json({ success: false, message: 'User not found' });
       return;
     }
 
-    const accessToken = jwt.sign(
-      { id: user._id.toString(), role: user.role },
-      env.JWT_SECRET as string,
-      { expiresIn: '15m' },
-    );
+    // Programmatically generate a new Supabase Auth session token
+    const tempPassword = crypto.randomBytes(24).toString('hex');
+    await supabase.auth.admin.updateUserById(user.id, { password: tempPassword });
 
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: tempPassword,
+    });
+
+    if (signInError || !signInData.session) {
+      res.status(401).json({ success: false, message: signInError?.message || 'Refresh failed' });
+      return;
+    }
+
+    const accessToken = signInData.session.access_token;
     const isProd = env.NODE_ENV === 'production';
     res.cookie('accessToken', accessToken, {
       httpOnly: true,
@@ -106,10 +135,15 @@ export async function revokeRefreshToken(req: Request, res: Response): Promise<v
       return;
     }
 
-    const tokens = await RefreshToken.find();
-    for (const t of tokens) {
-      const ok = await bcrypt.compare(cookieToken, t.tokenHash).catch(() => false);
-      if (ok) await RefreshToken.findByIdAndDelete(t._id);
+    const { data: tokens } = await supabase.from('refresh_tokens').select('*');
+
+    if (tokens) {
+      for (const t of tokens) {
+        const ok = await bcrypt.compare(cookieToken, t.token_hash).catch(() => false);
+        if (ok) {
+          await supabase.from('refresh_tokens').delete().eq('id', t.id);
+        }
+      }
     }
 
     const isProd = env.NODE_ENV === 'production';

@@ -1,9 +1,9 @@
-// Barrel export for all shared types and interfaces
 export type { JwtPayload, AuthTokens, CookieOptions } from '../interfaces/auth.interface';
-export type { IUser, IUserMethods, IUserModel } from '../interfaces/user.interface';
-export type { IProduct, IProductVariant, IProductMethods } from '../interfaces/product.interface';
-export type { ICart, ICartItem, ICartMethods } from '../interfaces/cart.interface';
+export type { IUser } from '../interfaces/user.interface';
+export type { IProduct, IProductVariant } from '../interfaces/product.interface';
+export type { ICart, ICartItem } from '../interfaces/cart.interface';
 export type { IOrder, IOrderItem, IShippingAddress, IPaymentInfo, IFinancials } from '../interfaces/order.interface';
+
 
 // Pagination
 export interface Pagination {

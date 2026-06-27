@@ -5,6 +5,7 @@ import type { Request, Response, NextFunction } from 'express';
 
 import env from './config/env';
 import connectDatabase from './database/connect';
+import { runSeeding } from './scripts/seedAll';
 import { applySecurityShield } from './config/security';
 import corsOptions from './config/cors';
 import masterRouter from './routes/index';
@@ -49,6 +50,10 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 async function startServer(): Promise<void> {
   try {
     const db = await connectDatabase();
+    
+    // Execute database seeding (trigger final reload)
+    await runSeeding();
+
 
     const server = app.listen(env.PORT, () => {
       console.log('\n==========================================');

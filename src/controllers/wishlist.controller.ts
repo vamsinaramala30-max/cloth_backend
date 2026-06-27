@@ -1,6 +1,5 @@
 import type { Request, Response } from 'express';
-import User from '../models/user';
-import Product from '../models/product';
+import { supabase } from '../database/connect';
 
 function getUserId(req: Request): string | undefined {
   return req.user?.id;
@@ -20,24 +19,31 @@ export const addToWishlist = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const product = await Product.findById(productId);
+    // Check if product exists
+    const { data: product } = await supabase
+      .from('products')
+      .select('id')
+      .eq('id', productId)
+      .maybeSingle();
+
     if (!product) {
       res.status(404).json({ success: false, message: 'Product not found' });
       return;
     }
 
-    const user = await User.findById(userId);
-    if (!user) {
-      res.status(404).json({ success: false, message: 'User not found' });
-      return;
-    }
+    // Insert into wishlist (ignore duplicate error if user already had it)
+    await supabase.from('wishlist').insert({ user_id: userId, product_id: productId });
 
-    if (!user.wishlist.some((id) => id.toString() === productId)) {
-      user.wishlist.push(product._id);
-      await user.save();
-    }
+    const { data: wishlist } = await supabase
+      .from('wishlist')
+      .select('product_id')
+      .eq('user_id', userId);
 
-    res.status(200).json({ success: true, message: 'Added to wishlist', wishlist: user.wishlist });
+    res.status(200).json({
+      success: true,
+      message: 'Added to wishlist',
+      wishlist: (wishlist || []).map((w) => w.product_id),
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to add to wishlist';
     res.status(500).json({ success: false, message });
@@ -54,21 +60,21 @@ export const removeFromWishlist = async (req: Request, res: Response): Promise<v
 
     const { productId } = req.body as { productId: string };
 
-    const user = await User.findById(userId);
-    if (!user) {
-      res.status(404).json({ success: false, message: 'User not found' });
-      return;
-    }
+    await supabase
+      .from('wishlist')
+      .delete()
+      .eq('user_id', userId)
+      .eq('product_id', productId);
 
-    const filtered = user.wishlist.filter((id) => id.toString() !== productId);
-    user.wishlist.splice(0, user.wishlist.length, ...filtered);
-
-    await user.save();
+    const { data: wishlist } = await supabase
+      .from('wishlist')
+      .select('product_id')
+      .eq('user_id', userId);
 
     res.status(200).json({
       success: true,
       message: 'Removed from wishlist',
-      wishlist: user.wishlist,
+      wishlist: (wishlist || []).map((w) => w.product_id),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to remove from wishlist';
@@ -84,13 +90,63 @@ export const getWishlist = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const user = await User.findById(userId).populate('wishlist');
-    if (!user) {
-      res.status(404).json({ success: false, message: 'User not found' });
+    const { data: wishlist } = await supabase
+      .from('wishlist')
+      .select('product_id')
+      .eq('user_id', userId);
+
+    const productIds = (wishlist || []).map((w) => w.product_id);
+
+    if (productIds.length === 0) {
+      res.status(200).json({ success: true, data: [] });
       return;
     }
 
-    res.status(200).json({ success: true, data: user.wishlist });
+    const { data: products } = await supabase
+      .from('products')
+      .select('*')
+      .in('id', productIds);
+
+    const { data: variants } = await supabase
+      .from('product_variants')
+      .select('*')
+      .in('product_id', productIds);
+
+    const mapped = (products || []).map((p) => {
+      const pVariants = (variants || [])
+        .filter((v) => v.product_id === p.id)
+        .map((v) => ({
+          _id: v.id,
+          id: v.id,
+          sku: v.sku,
+          color: v.color,
+          colorName: v.color_name,
+          size: v.size,
+          stock: v.stock,
+          images: v.images || [],
+        }));
+
+      return {
+        _id: p.id,
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        description: p.description,
+        basePrice: Number(p.base_price),
+        salePrice: p.sale_price !== null && p.sale_price !== undefined ? Number(p.sale_price) : undefined,
+        category: p.category,
+        collections: p.collections || [],
+        tags: p.tags || [],
+        isFeatured: p.is_featured,
+        isActive: p.is_active,
+        popularity: Number(p.popularity || 0),
+        variants: pVariants,
+        createdAt: p.created_at,
+        updatedAt: p.updated_at,
+      };
+    });
+
+    res.status(200).json({ success: true, data: mapped });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to get wishlist';
     res.status(500).json({ success: false, message });

@@ -1,6 +1,5 @@
 import type { Request, Response } from 'express';
-import Product from '../models/product';
-import Collection from '../models/collection';
+import { supabase } from '../database/connect';
 
 const productsData = [
   // 1
@@ -643,12 +642,57 @@ export const seedDatabase = async (req: Request, res: Response): Promise<void> =
     console.log('Seeding process initiated...');
     
     // 1. Clear database
-    await Product.deleteMany({});
-    await Collection.deleteMany({});
-    console.log('Cleared existing products and collections.');
+    await supabase.from('product_variants').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('collections').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabase.from('collection_products').delete().neq('collection_id', '00000000-0000-0000-0000-000000000000');
+    console.log('Cleared existing products, variants, collections.');
 
-    // 2. Insert Products
-    const createdProducts = await Product.create(productsData);
+    // 2. Insert Products and Variants
+    const createdProducts: any[] = [];
+    for (const p of productsData) {
+      const { data: product, error: prodErr } = await supabase
+        .from('products')
+        .insert({
+          name: p.name,
+          slug: p.slug,
+          description: p.description,
+          base_price: p.basePrice,
+          sale_price: p.salePrice,
+          category: p.category,
+          collections: p.collections,
+          tags: p.tags,
+          is_featured: p.isFeatured,
+          is_active: p.isActive,
+          popularity: p.popularity,
+        })
+        .select()
+        .single();
+
+      if (prodErr || !product) {
+        throw new Error(`Failed to seed product ${p.name}: ${prodErr?.message}`);
+      }
+
+      createdProducts.push(product);
+
+      // Insert variants for this product
+      if (p.variants && p.variants.length > 0) {
+        const dbVariants = p.variants.map((v: any) => ({
+          product_id: product.id,
+          sku: v.sku,
+          color: v.color,
+          color_name: v.colorName,
+          size: v.size,
+          stock: v.stock,
+          images: v.images || [],
+        }));
+
+        const { error: varErr } = await supabase.from('product_variants').insert(dbVariants);
+        if (varErr) {
+          throw new Error(`Failed to seed variants for ${p.name}: ${varErr.message}`);
+        }
+      }
+    }
     console.log(`Seeded ${createdProducts.length} products.`);
 
     // 3. Insert Collections with matching products references
@@ -660,16 +704,42 @@ export const seedDatabase = async (req: Request, res: Response): Promise<void> =
         );
       });
 
-      const featuredProductIds = matchingProducts.slice(0, 4).map((p) => p._id);
+      const featuredProductIds = matchingProducts.slice(0, 4).map((p) => p.id);
 
-      const collection = new Collection({
-        ...c,
-        title: c.name,
-        featuredProducts: featuredProductIds,
-        productCount: matchingProducts.length,
-      });
+      const { data: collection, error: colErr } = await supabase
+        .from('collections')
+        .insert({
+          name: c.name,
+          title: c.name,
+          slug: c.slug,
+          description: c.description,
+          long_description: c.longDescription,
+          image: c.image,
+          banner_image: c.bannerImage,
+          accent_color: c.accentColor,
+          featured_products: featuredProductIds,
+          product_count: matchingProducts.length,
+          display_order: c.displayOrder,
+          is_active: c.isActive,
+          seo_title: c.seoTitle,
+          seo_description: c.seoDescription,
+        })
+        .select()
+        .single();
 
-      await collection.save();
+      if (colErr || !collection) {
+        throw new Error(`Failed to seed collection ${c.name}: ${colErr?.message}`);
+      }
+
+      // Link in collection_products map
+      if (matchingProducts.length > 0) {
+        const links = matchingProducts.map((p) => ({
+          collection_id: collection.id,
+          product_id: p.id,
+        }));
+        await supabase.from('collection_products').insert(links);
+      }
+
       console.log(`Seeded collection: ${c.name} with ${matchingProducts.length} products.`);
     }
 

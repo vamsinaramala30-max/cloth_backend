@@ -1,8 +1,7 @@
-import type { Document, Model, Types } from 'mongoose';
-
 export interface ICartItem {
-  _id: Types.ObjectId;
-  productId: Types.ObjectId;
+  _id?: string;
+  id?: string;
+  productId: string;
   variantSku?: string;
   name: string;
   price: number;
@@ -13,15 +12,10 @@ export interface ICartItem {
 }
 
 export interface ICart {
-  userId: Types.ObjectId;
+  _id?: string;
+  id?: string;
+  userId: string;
   items: ICartItem[];
   createdAt: Date;
   updatedAt: Date;
 }
-
-export interface ICartMethods {
-  getTotal(): number;
-}
-
-export type ICartDocument = ICart & ICartMethods & Document;
-export type ICartModel = Model<ICart, Record<string, never>, ICartMethods>;

@@ -4,33 +4,43 @@ import path from 'path';
 dotenv.config({ path: path.join(__dirname, '../../.env.local') });
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-import connectDatabase from '../database/connect';
-import Product from '../models/product';
-import Collection from '../models/collection';
+import { supabase } from '../database/connect';
 
 async function check() {
   try {
-    console.log('Connecting to database...');
-    // Temporarily force SKIP_DB to false to test real connection
-    process.env.SKIP_DB = 'false';
-    await connectDatabase();
+    console.log('Connecting to database via Supabase client...');
     
-    const productCount = await Product.countDocuments({});
-    const collectionCount = await Collection.countDocuments({});
-    
+    const { count: productCount, error: pError } = await supabase
+      .from('products')
+      .select('*', { count: 'exact', head: true });
+
+    if (pError) throw pError;
+
+    const { count: collectionCount, error: cError } = await supabase
+      .from('collections')
+      .select('*', { count: 'exact', head: true });
+
+    if (cError) throw cError;
+
     console.log(`Product count: ${productCount}`);
     console.log(`Collection count: ${collectionCount}`);
-    
-    if (productCount > 0) {
-      const sampleProducts = await Product.find({}).limit(5);
-      console.log('Sample Products:', sampleProducts.map(p => ({ name: p.name, collections: p.collections })));
+
+    if (productCount && productCount > 0) {
+      const { data: sampleProducts } = await supabase
+        .from('products')
+        .select('name, collections')
+        .limit(5);
+      console.log('Sample Products:', sampleProducts);
     }
-    
-    if (collectionCount > 0) {
-      const sampleCollections = await Collection.find({});
-      console.log('Sample Collections:', sampleCollections.map(c => ({ name: c.name, slug: c.slug, products: c.featuredProducts })));
+
+    if (collectionCount && collectionCount > 0) {
+      const { data: sampleCollections } = await supabase
+        .from('collections')
+        .select('name, slug, featured_products')
+        .limit(5);
+      console.log('Sample Collections:', sampleCollections);
     }
-    
+
     process.exit(0);
   } catch (error) {
     console.error('Error checking database:', error);

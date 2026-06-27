@@ -1,6 +1,6 @@
-import type { Document, Model, Types } from 'mongoose';
-
 export interface ICollection {
+  _id?: string;
+  id?: string;
   name: string;
   title: string;
   slug: string;
@@ -9,7 +9,7 @@ export interface ICollection {
   image: string;
   bannerImage?: string;
   accentColor?: string;
-  featuredProducts: Types.ObjectId[];
+  featuredProducts: string[];
   productCount: number;
   displayOrder: number;
   isActive: boolean;
@@ -18,10 +18,3 @@ export interface ICollection {
   createdAt: Date;
   updatedAt: Date;
 }
-
-export interface ICollectionMethods {
-  // Add custom instance methods if needed
-}
-
-export type ICollectionDocument = ICollection & ICollectionMethods & Document;
-export type ICollectionModel = Model<ICollection, Record<string, never>, ICollectionMethods>;
